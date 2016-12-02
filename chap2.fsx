@@ -9,6 +9,7 @@ open XPlot.GoogleCharts.Deedle
 type WorldData = XmlProvider<"http://api.worldbank.org/countries/indicators/NY.GDP.PCAP.CD?date=2010:2010">
 
 let indUrl = "http://api.worldbank.org/countries/indicators/"
+
 let getData year indicator = 
     let query =
        [("per_page","1000");
@@ -42,3 +43,25 @@ let codes =
 
 let world =
     frame [for name, ind in codes -> name, getData 2010 ind.IndicatorCode]
+
+// Normalizing the data
+// RProvider not opened yet!
+let low = Stats.min world
+let high = Stats.max world
+let avg = Stats.mean world
+
+let completeFrame =
+    world
+    |> Frame.transpose
+    |> Frame.fillMissingUsing (fun _ ind -> avg.[ind])
+
+let norm =
+    (completeFrame - low)/(high - low)
+    |> Frame.transpose
+
+let gdp = log norm.["GDP"] |> Series.values 
+let life = norm.["Life"] |> Series.values
+let options = Options(pointSize=3, colors=[|"#3B8FCC"|], trendlines=[|Trendline(opacity=0.5,lineWidth=10)|], hAxis=Axis(title="Log of scaled GDP (per capita)"), vAxis=Axis(title="Life expectancy (scaled)"))
+
+Chart.Scatter(Seq.zip gdp life) 
+|> Chart.WithOptions(options)
